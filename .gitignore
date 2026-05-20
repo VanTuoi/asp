@@ -1,0 +1,31 @@
+## Ignore Visual Studio Temporary Files and Build Results
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Re]leases/
+x64/
+x86/
+[Aa]rm/
+[Aa]rm64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Log]s/
+
+# Visual Studio cache/options directory
+.vs/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userbg
+*.usertasks
+
+# Secrets / local config
+appsettings.Development.json
+
+# User Uploads
+APPMVC/wwwroot/uploads/*
+!APPMVC/wwwroot/uploads/.gitkeep
