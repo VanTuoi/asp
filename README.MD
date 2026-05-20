@@ -2,14 +2,16 @@
 
 ## 1. Cấu hình Connection String (`appsettings.json`)
 
-* **Cách 1: Windows Authentication (Xác thực Windows)**
+- **Cách 1: Windows Authentication (Xác thực Windows)**
+
 ```json
 "ConnectionStrings": {
   "DefaultConnection": "Server=.\\SQLEXPRESS;Database=APPMVC;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
 }
 ```
 
-* **Cách 2: SQL Server Authentication (Tài khoản sa/sa2008)**
+- **Cách 2: SQL Server Authentication (Tài khoản sa/sa2008)**
+
 ```json
 "ConnectionStrings": {
   "DefaultConnection": "Server=.\\SQLEXPRESS;Database=APPMVC;User Id=sa;Password=sa2008;TrustServerCertificate=True;MultipleActiveResultSets=true"
@@ -93,3 +95,9 @@ GO
 ```bash
 dotnet watch run
 ```
+
+// CMD
+for /f "delims=" %f in ('dir /b /s .\APPMVC\*.cs .\APPMVC\*.cshtml .\APPMVC\*.json ^| findstr /v "\\bin\\" ^| findstr /v "\\obj\\"') do @echo. & @echo --- FILE: %~nxf --- & @type "%f") > AllCode.txt
+
+// PowerShell
+Get-ChildItem -Path .\APPMVC -File -Recurse | Where-Object { ($_.Extension -in ".cs", ".cshtml", ".json") -and ($_.FullName -notmatch "\\bin\\|\\obj\\") } | ForEach-Object { "`n`n--- FILE: $($_.Name) ---`n" + (Get-Content $\_.FullName -Raw) } | Out-File AllCode.txt -Encoding utf8

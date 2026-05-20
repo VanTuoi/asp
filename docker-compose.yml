@@ -1,0 +1,34 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5075:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=APPMVC;User Id=sa;Password=V@nTuoi12345!;TrustServerCertificate=True;MultipleActiveResultSets=true
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - uploads-data:/app/wwwroot/uploads
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "14333:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=V@nTuoi12345!
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/mssql-tools12/bin/sqlcmd -S localhost -U sa -P V@nTuoi12345! -Q 'SELECT 1' || exit 1" ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+volumes:
+  uploads-data:
+  sqlserver-data:
