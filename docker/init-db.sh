@@ -1,3 +1,4 @@
+﻿#!/bin/bash
 set -e
 
 /opt/mssql/bin/sqlservr &
