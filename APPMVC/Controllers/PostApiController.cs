@@ -79,13 +79,18 @@ namespace APPMVC.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreatePost(Post post, List<IFormFile> files)
+        public async Task<IActionResult> CreatePost(PostViewModel model, List<IFormFile> files)
         {
             if (!ModelState.IsValid) return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
             if (!int.TryParse(UserId, out int userId)) return Json(new { success = false, message = "Vui lòng đăng nhập lại." });
 
-            post.CreatedAt = DateTime.Now;
-            post.UserId = userId;
+            var post = new Post
+            {
+                Title = model.Title,
+                Content = model.Content,
+                CreatedAt = DateTime.Now,
+                UserId = userId
+            };
 
             var error = ValidateFiles(files);
             if (error != null) return Json(new { success = false, message = error });
@@ -98,16 +103,25 @@ namespace APPMVC.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> UpdatePost(Post post, List<IFormFile> files)
+        public async Task<IActionResult> UpdatePost(PostViewModel model, List<IFormFile> files)
         {
             if (!ModelState.IsValid) return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
 
-            var existing = _postRepository.GetPostById(post.Id);
+            var existing = _postRepository.GetPostById(model.Id);
             if (existing == null) return Json(new { success = false, message = "Bài viết không tồn tại." });
             if (!IsOwnerOrAdmin(existing)) return Json(new { success = false, message = "Bạn không có quyền cập nhật." });
 
             var error = ValidateFiles(files);
             if (error != null) return Json(new { success = false, message = error });
+
+            var post = new Post
+            {
+                Id = model.Id,
+                Title = model.Title,
+                Content = model.Content,
+                UserId = existing.UserId,
+                CreatedAt = existing.CreatedAt
+            };
 
             if (_postRepository.UpdatePost(post))
             {

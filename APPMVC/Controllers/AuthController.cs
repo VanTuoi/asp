@@ -20,49 +20,47 @@ namespace APPMVC.Controllers
         public IActionResult Register() => User.Identity?.IsAuthenticated == true ? RedirectToAction("Index", "Home") : View();
 
         [HttpPost]
-        public IActionResult Register(string name, string email, string phoneNumber, string password, string role)
+        public IActionResult Register(RegisterViewModel model)
         {
-            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(phoneNumber) || string.IsNullOrEmpty(password))
+            if (!ModelState.IsValid)
             {
-                ModelState.AddModelError("", "Please fill in all fields.");
-                return View();
+                return View(model);
             }
 
             var user = new User
             {
-                Name = name,
-                Email = email,
-                PhoneNumber = phoneNumber,
-                roles = [Enum.TryParse<Role>(role, out var parsedRole) ? parsedRole : Role.USER]
+                Name = model.Name,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                roles = [Enum.TryParse<Role>(model.Role, out var parsedRole) ? parsedRole : Role.USER]
             };
 
-            if (_userRepository.Register(user, password))
+            if (_userRepository.Register(user, model.Password))
             {
-                TempData["SuccessMessage"] = "Registration successful! Please login.";
+                TempData["SuccessMessage"] = "Đăng ký thành công! Vui lòng đăng nhập.";
                 return RedirectToAction("Login");
             }
 
-            ModelState.AddModelError("", "Email already exists.");
-            return View();
+            ModelState.AddModelError("", "Email đã tồn tại.");
+            return View(model);
         }
 
         [HttpGet]
         public IActionResult Login() => User.Identity?.IsAuthenticated == true ? RedirectToAction("Index", "Home") : View();
 
         [HttpPost]
-        public async Task<IActionResult> Login(string email, string password)
+        public async Task<IActionResult> Login(LoginViewModel model)
         {
-            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
+            if (!ModelState.IsValid)
             {
-                ModelState.AddModelError("", "Please enter email and password.");
-                return View();
+                return View(model);
             }
 
-            var user = _userRepository.Login(email, password);
+            var user = _userRepository.Login(model.Email, model.Password);
             if (user == null)
             {
-                ModelState.AddModelError("", "Invalid email or password.");
-                return View();
+                ModelState.AddModelError("", "Email hoặc mật khẩu không chính xác.");
+                return View(model);
             }
 
             var claims = new List<Claim>

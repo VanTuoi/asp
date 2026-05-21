@@ -85,16 +85,21 @@ namespace APPMVC.Controllers
         public IActionResult Create() => View();
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Post post, List<IFormFile> files)
+        public async Task<IActionResult> Create(PostViewModel model, List<IFormFile> files)
         {
-            if (!ModelState.IsValid) return View(post);
+            if (!ModelState.IsValid) return View(model);
             if (!int.TryParse(UserId, out int userId)) return Challenge();
 
-            post.CreatedAt = DateTime.Now;
-            post.UserId = userId;
+            var post = new Post
+            {
+                Title = model.Title,
+                Content = model.Content,
+                CreatedAt = DateTime.Now,
+                UserId = userId
+            };
 
             var error = ValidateFiles(files);
-            if (error != null) { ViewData["ErrorMessage"] = error; return View(); }
+            if (error != null) { ViewData["ErrorMessage"] = error; return View(model); }
 
             await PersistFilesAsync(files, post);
 
@@ -104,7 +109,7 @@ namespace APPMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
             ModelState.AddModelError("", "Lỗi lưu CSDL (Rollback).");
-            return View();
+            return View(model);
         }
 
         [HttpPost, ValidateAntiForgeryToken]
@@ -127,24 +132,41 @@ namespace APPMVC.Controllers
             var post = _postRepository.GetPostById(id);
             if (post == null) return NotFound();
             if (!IsOwnerOrAdmin(post)) return Forbid();
-            return View(post);
+
+            var model = new PostViewModel
+            {
+                Id = post.Id,
+                Title = post.Title,
+                Content = post.Content,
+                Attachments = post.Attachments
+            };
+            return View(model);
         }
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(Post post, List<IFormFile> files)
+        public async Task<IActionResult> Edit(PostViewModel model, List<IFormFile> files)
         {
             if (!ModelState.IsValid)
             {
-                post.Attachments = _postRepository.GetPostById(post.Id)?.Attachments ?? [];
-                return View(post);
+                model.Attachments = _postRepository.GetPostById(model.Id)?.Attachments ?? [];
+                return View(model);
             }
 
-            var existing = _postRepository.GetPostById(post.Id);
+            var existing = _postRepository.GetPostById(model.Id);
             if (existing == null) return NotFound();
             if (!IsOwnerOrAdmin(existing)) return Forbid();
 
             var error = ValidateFiles(files);
-            if (error != null) { ViewData["ErrorMessage"] = error; post.Attachments = existing.Attachments; return View(post); }
+            if (error != null) { ViewData["ErrorMessage"] = error; model.Attachments = existing.Attachments; return View(model); }
+
+            var post = new Post
+            {
+                Id = model.Id,
+                Title = model.Title,
+                Content = model.Content,
+                UserId = existing.UserId,
+                CreatedAt = existing.CreatedAt
+            };
 
             if (_postRepository.UpdatePost(post))
             {
@@ -153,8 +175,8 @@ namespace APPMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
             ModelState.AddModelError("", "Cập nhật thất bại.");
-            post.Attachments = existing.Attachments;
-            return View(post);
+            model.Attachments = existing.Attachments;
+            return View(model);
         }
     }
 }
