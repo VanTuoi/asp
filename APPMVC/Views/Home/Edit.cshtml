@@ -3,71 +3,56 @@
     ViewData["Title"] = "Chỉnh sửa bài viết";
 }
 
-<div class="container mt-4" style="max-width: 800px;">
-    <div class="card shadow">
-        <div class="card-header bg-warning text-dark">
-            <h4 class="mb-0">Chỉnh sửa bài viết</h4>
-        </div>
-        <div class="card-body">
-            @* Hỗ trợ tải file đính kèm mới *@
-            <form asp-action="Edit" method="post" enctype="multipart/form-data">
-                
-                @* CSRF Token *@
-                @Html.AntiForgeryToken()
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h4 class="mb-4">Chỉnh sửa bài viết</h4>
 
-                @* Hidden Input để mang theo ID *@
-                <input type="hidden" asp-for="Id" />
+                @if (ViewData["ErrorMessage"] != null)
+                {
+                    <div class="alert alert-danger">@ViewData["ErrorMessage"]</div>
+                }
 
-                <div class="text-danger" asp-validation-summary="ModelOnly"></div>
+                <form asp-action="Edit" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
 
-                <div class="mb-3">
-                    <label asp-for="Title" class="form-label font-weight-bold">Tiêu đề bài viết</label>
-                    <input asp-for="Title" class="form-control" placeholder="Nhập tiêu đề..." />
-                    <span asp-validation-for="Title" class="text-danger"></span>
-                </div>
+                    <div class="mb-3">
+                        <label asp-for="Title" class="form-label">Tiêu đề</label>
+                        <input asp-for="Title" class="form-control" required />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
 
-                <div class="mb-3">
-                    <label asp-for="Content" class="form-label font-weight-bold">Nội dung bài viết</label>
-                    <textarea asp-for="Content" rows="6" class="form-control" placeholder="Viết nội dung tại đây..."></textarea>
-                    <span asp-validation-for="Content" class="text-danger"></span>
-                </div>
+                    <div class="mb-3">
+                        <label asp-for="Content" class="form-label">Nội dung</label>
+                        <textarea asp-for="Content" rows="6" class="form-control" required></textarea>
+                        <span asp-validation-for="Content" class="text-danger"></span>
+                    </div>
 
-                <!-- DANH SÁCH FILE ĐÍNH KÈM HIỆN TẠI -->
-                <div class="mb-4">
-                    <label class="form-label font-weight-bold">Tệp đính kèm hiện tại</label>
-                    @if (Model.Attachments != null && Model.Attachments.Any())
-                    {
-                        <ul class="list-group mb-2" id="attachment-list">
-                            @foreach (var attach in Model.Attachments)
+                    <div class="mb-3">
+                        <label class="form-label">Tệp đính kèm hiện tại</label>
+                        <ul class="list-group">
+                            @foreach (var a in Model.Attachments ?? [])
                             {
-                                <li class="list-group-item d-flex justify-content-between align-items-center" id="attach-item-@attach.Id">
-                                    <a href="@attach.FilePath" target="_blank"><i class="bi bi-file-earmark-arrow-down"></i> @attach.FileName</a>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAttachmentAjax(@attach.Id)">
-                                        Xóa tệp
-                                    </button>
+                                <li class="list-group-item d-flex justify-content-between align-items-center" id="attach-@a.Id">
+                                    <a href="@a.FilePath" target="_blank">@a.FileName</a>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteAttach(@a.Id)">Xóa</button>
                                 </li>
                             }
                         </ul>
-                    }
-                    else
-                    {
-                        <p class="text-muted" id="no-attachment-text">Không có tệp đính kèm nào.</p>
-                    }
-                </div>
+                    </div>
 
-                <!-- THÊM FILE ĐÍNH KÈM MỚI -->
-                <div class="mb-3">
-                    <label for="files" class="form-label font-weight-bold">Thêm tệp đính kèm mới (.jpg, .png, .pdf, .doc, .docx - Tối đa 5MB/file)</label>
-                    <input type="file" id="files" name="files" class="form-control" multiple />
-                    <small class="text-muted">Có thể chọn nhiều file đính kèm mới cùng lúc.</small>
-                </div>
+                    <div class="mb-4">
+                        <label for="files" class="form-label">Thêm tệp mới</label>
+                        <input type="file" id="files" name="files" class="form-control" multiple />
+                    </div>
 
-                <div class="d-flex justify-content-between mt-4">
-                    <a asp-action="Index" class="btn btn-outline-secondary">Quay lại danh sách</a>
-                    <button type="submit" class="btn btn-warning"><i class="bi bi-save"></i> Cập nhật bài viết</button>
-                </div>
-
-            </form>
+                    <button type="submit" class="btn btn-primary">Cập nhật</button>
+                    <a asp-action="Index" class="btn btn-secondary ms-2">Hủy</a>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -75,23 +60,14 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        function deleteAttachmentAjax(attachId) {
-            if (confirm("Bạn có chắc chắn muốn xóa?")) {
-                fetch(`/PostApi/DeleteAttachmentAjax?id=${attachId}`, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById(`attach-item-${attachId}`)?.remove();
-                        const list = document.getElementById('attachment-list');
-                        if (list && list.children.length === 0) {
-                            list.remove();
-                            const noAttachHtml = '<p class="text-muted" id="no-attachment-text">Không có tệp đính kèm nào.</p>';
-                            $('#attachment-list').parent().append(noAttachHtml);
-                        }
-                    }
-                    alert(data.message);
+        function deleteAttach(id) {
+            if (!confirm("Xóa tệp này?")) return;
+            fetch(`/PostApi/DeleteAttachmentAjax?id=${id}`, { method: 'POST' })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) document.getElementById(`attach-${id}`).remove();
+                    alert(d.message);
                 });
-            }
         }
     </script>
 }

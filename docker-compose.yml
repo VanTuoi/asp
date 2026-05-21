@@ -16,18 +16,21 @@ services:
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    user: root
     ports:
       - "14333:1433"
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=V@nTuoi12345!
+    entrypoint: /bin/bash /docker/init-db.sh
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/mssql-tools12/bin/sqlcmd -S localhost -U sa -P V@nTuoi12345! -Q 'SELECT 1' || exit 1" ]
+      test: [ "CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P V@nTuoi12345! -Q 'SELECT 1' -C || exit 1" ]
       interval: 10s
       timeout: 3s
-      retries: 10
+      retries: 15
     volumes:
       - sqlserver-data:/var/opt/mssql
+      - ./docker:/docker
 
 volumes:
   uploads-data:

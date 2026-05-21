@@ -16,10 +16,11 @@ namespace APPMVC.Models
         public string Content { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
         public int UserId { get; set; }
-        
-        // Navigation properties (used for display, populated via JOIN queries)
+
         public string AuthorName { get; set; } = string.Empty;
+        
         public List<Attachment> Attachments { get; set; } = new List<Attachment>();
     }
 }
