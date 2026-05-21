@@ -15,97 +15,69 @@ namespace APPMVC.Repositories
                 ?? throw new ArgumentNullException("DefaultConnection string is missing");
         }
 
-        public string HashPassword(string password)
-        {
-            var bytes = Encoding.UTF8.GetBytes(password);
-            var hash = SHA256.HashData(bytes);
-            return Convert.ToHexString(hash);
-        }
+        public string HashPassword(string password) => 
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(password)));
 
         public bool Register(User user, string password)
         {
-            using (var connection = new SqlConnection(_connectionString))
-            {
-                connection.Open();
+            using var connection = new SqlConnection(_connectionString);
+            connection.Open();
 
-                // Check if username exists
-                var checkQuery = "SELECT COUNT(1) FROM Users WHERE UserName = @UserName";
-                using (var checkCmd = new SqlCommand(checkQuery, connection))
-                {
-                    checkCmd.Parameters.AddWithValue("@UserName", user.UserName);
-                    int exists = (int)checkCmd.ExecuteScalar()!;
-                    if (exists > 0)
-                    {
-                        return false;
-                    }
-                }
+            var checkQuery = "SELECT COUNT(1) FROM Users WHERE Email = @Email";
+            using var checkCmd = new SqlCommand(checkQuery, connection);
+            checkCmd.Parameters.AddWithValue("@Email", user.Email);
+            
+            if ((int)checkCmd.ExecuteScalar()! > 0) return false;
 
-                // Insert user
-                var insertQuery = @"
-                    INSERT INTO Users (Name, UserName, PasswordHash, Roles)
-                    VALUES (@Name, @UserName, @PasswordHash, @Roles)";
-                
-                string passwordHash = HashPassword(password);
-                string rolesStr = string.Join(",", user.roles.Select(r => r.ToString()));
+            var insertQuery = @"
+                INSERT INTO Users (Name, Email, PhoneNumber, Gender, PasswordHash, Roles)
+                VALUES (@Name, @Email, @PhoneNumber, @Gender, @PasswordHash, @Roles)";
+            
+            using var insertCmd = new SqlCommand(insertQuery, connection);
+            insertCmd.Parameters.AddWithValue("@Name", user.Name);
+            insertCmd.Parameters.AddWithValue("@Email", user.Email);
+            insertCmd.Parameters.AddWithValue("@PhoneNumber", user.PhoneNumber);
+            insertCmd.Parameters.AddWithValue("@Gender", user.Gender);
+            insertCmd.Parameters.AddWithValue("@PasswordHash", HashPassword(password));
+            insertCmd.Parameters.AddWithValue("@Roles", string.Join(",", user.roles));
 
-                using (var insertCmd = new SqlCommand(insertQuery, connection))
-                {
-                    insertCmd.Parameters.AddWithValue("@Name", user.Name);
-                    insertCmd.Parameters.AddWithValue("@UserName", user.UserName);
-                    insertCmd.Parameters.AddWithValue("@PasswordHash", passwordHash);
-                    insertCmd.Parameters.AddWithValue("@Roles", rolesStr);
-
-                    insertCmd.ExecuteNonQuery();
-                }
-            }
+            insertCmd.ExecuteNonQuery();
             return true;
         }
 
-        public User? Login(string username, string password)
+        public User? Login(string email, string password)
         {
-            using (var connection = new SqlConnection(_connectionString))
+            using var connection = new SqlConnection(_connectionString);
+            connection.Open();
+            
+            var query = "SELECT Id, Name, Email, PhoneNumber, Gender, PasswordHash, Roles FROM Users WHERE Email = @Email";
+            using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@Email", email);
+            
+            using var reader = command.ExecuteReader();
+            
+            if (!reader.Read()) return null;
+
+            string dbPasswordHash = (string)reader["PasswordHash"];
+            
+            if (dbPasswordHash != HashPassword(password)) return null;
+
+            string rolesStr = (string)reader["Roles"];
+            return new User
             {
-                connection.Open();
-                var query = "SELECT Id, Name, UserName, PasswordHash, Roles FROM Users WHERE UserName = @UserName";
-                using (var command = new SqlCommand(query, connection))
-                {
-                    command.Parameters.AddWithValue("@UserName", username);
-                    using (var reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            string dbPasswordHash = reader.GetString(3);
-                            string inputHash = HashPassword(password);
-
-                            if (dbPasswordHash == inputHash)
-                            {
-                                var user = new User
-                                {
-                                    Id = reader.GetInt32(0),
-                                    Name = reader.GetString(1),
-                                    UserName = reader.GetString(2),
-                                    PasswordHash = dbPasswordHash,
-                                    roles = new List<Role>()
-                                };
-
-                                string rolesStr = reader.GetString(4);
-                                if (!string.IsNullOrEmpty(rolesStr))
-                                {
-                                    foreach (var r in rolesStr.Split(','))
-                                    {
-                                        if (Enum.TryParse<Role>(r, out var role))
-                                        {
-                                            user.roles.Add(role);
-                                        }
-                                    }
-                                }
-                                return user;
-                            }
-                        }
-                    }
-                }
-            }
-            return null;
+                Id = (int)reader["Id"],
+                Name = (string)reader["Name"],
+                Email = (string)reader["Email"],
+                PhoneNumber = (string)reader["PhoneNumber"],
+                Gender = (string)reader["Gender"],
+                PasswordHash = dbPasswordHash,
+                roles = string.IsNullOrEmpty(rolesStr) 
+                    ? [] 
+                    : rolesStr.Split(',')
+                        .Where(r => Enum.TryParse<Role>(r, out _))
+                        .Select(Enum.Parse<Role>)
+                        .ToList()
+            };
         }
     }
 }

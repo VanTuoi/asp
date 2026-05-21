@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace APPMVC.Models
 {
     public class Attachment

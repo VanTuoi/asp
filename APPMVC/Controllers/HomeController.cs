@@ -25,305 +25,158 @@ namespace APPMVC.Controllers
             _env = env;
         }
 
-        [AllowAnonymous]
-        public IActionResult Index()
+        private string? UserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        private bool IsOwnerOrAdmin(Post p) => p.UserId.ToString() == UserId || User.IsInRole("ADMIN");
+
+        private void DeletePhysicalFile(string path)
         {
-            var posts = _postRepository.GetPosts();
-            return View(posts);
+            var full = Path.Combine(_env.WebRootPath, path.TrimStart('/'));
+            if (System.IO.File.Exists(full)) System.IO.File.Delete(full);
+        }
+
+        private static readonly string[] _allowedExt = [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"];
+        private const long _maxSize = 5 * 1024 * 1024;
+
+        private string? ValidateFiles(List<IFormFile>? files)
+        {
+            if (files == null) return null;
+            foreach (var f in files.Where(f => f?.Length > 0))
+            {
+                if (f.Length > _maxSize) return $"File {f.FileName} vượt quá 5MB.";
+                var ext = Path.GetExtension(f.FileName).ToLowerInvariant();
+                if (!_allowedExt.Contains(ext)) return $"File {f.FileName} không đúng định dạng.";
+                if (!FileHelper.ValidateFileSignature(f, ext)) return $"Nội dung file {f.FileName} không hợp lệ.";
+            }
+            return null;
+        }
+
+        private async Task PersistFilesAsync(List<IFormFile>? files, Post post, int? postId = null)
+        {
+            if (files == null) return;
+            var dir = Path.Combine(_env.WebRootPath, "uploads");
+            Directory.CreateDirectory(dir);
+            foreach (var f in files.Where(f => f?.Length > 0))
+            {
+                var ext = Path.GetExtension(f.FileName).ToLowerInvariant();
+                var name = $"{Guid.NewGuid()}{ext}";
+                await using var stream = new FileStream(Path.Combine(dir, name), FileMode.Create);
+                await f.CopyToAsync(stream);
+                var a = new Attachment { FileName = f.FileName, FilePath = "/uploads/" + name };
+                if (postId.HasValue) { a.PostId = postId.Value; _postRepository.AddAttachment(a); }
+                else post.Attachments.Add(a);
+            }
+        }
+
+        [AllowAnonymous]
+        public IActionResult Index(string? search)
+        {
+            ViewData["Search"] = search;
+            return View(_postRepository.GetPosts(search));
         }
 
         [AllowAnonymous]
         public IActionResult Details(int id)
         {
             var post = _postRepository.GetPostById(id);
-            if (post == null)
-            {
-                return NotFound();
-            }
-            return View(post);
+            return post == null ? NotFound() : View(post);
         }
 
         [HttpGet]
-        public IActionResult Create()
+        public IActionResult Create() => View();
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(PostViewModel model, List<IFormFile> files)
         {
-            return View();
-        }
+            if (!ModelState.IsValid) return View(model);
+            if (!int.TryParse(UserId, out int userId)) return Challenge();
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Post post, List<IFormFile> files)
-        {
-            if (!ModelState.IsValid)
+            var post = new Post
             {
-                return View(post);
-            }
+                Title = model.Title,
+                Content = model.Content,
+                CreatedAt = DateTime.Now,
+                UserId = userId
+            };
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdClaim, out int userId))
+            var error = ValidateFiles(files);
+            if (error != null) { ViewData["ErrorMessage"] = error; return View(model); }
+
+            await PersistFilesAsync(files, post);
+
+            if (_postRepository.CreatePost(post))
             {
-                return Challenge();
-            }
-
-            post.CreatedAt = DateTime.Now;
-            post.UserId = userId;
-
-            if (files != null && files.Count > 0)
-            {
-                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx" };
-                var allowedMimeTypes = new[] { 
-                    "image/jpeg", 
-                    "image/png", 
-                    "application/pdf", 
-                    "application/msword", 
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" 
-                };
-                long maxFileSize = 5 * 1024 * 1024; // 5 MB
-
-                foreach (var file in files)
-                {
-                    if (file == null || file.Length == 0) continue;
-
-                    if (file.Length > maxFileSize)
-                    {
-                        ViewData["ErrorMessage"] = $"File {file.FileName} vượt quá dung lượng cho phép (Max 5MB).";
-                        return View();
-                    }
-
-                    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                    if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
-                    {
-                        ViewData["ErrorMessage"] = $"File {file.FileName} không đúng định dạng cho phép (.jpg, .png, .pdf, .doc, .docx).";
-                        return View();
-                    }
-
-                    // Kiểm tra MIME Type để chống giả dạng file
-                    var mime = file.ContentType.ToLowerInvariant();
-                    if (!allowedMimeTypes.Contains(mime))
-                    {
-                        ViewData["ErrorMessage"] = $"File {file.FileName} có kiểu nội dung (MIME Type) không hợp lệ.";
-                        return View();
-                    }
-
-                    // Kiểm tra chữ ký file thực tế (Magic Bytes) để chống đổi đuôi giả mạo (ví dụ .mp4 thành .png)
-                    if (!FileHelper.ValidateFileSignature(file, ext))
-                    {
-                        ViewData["ErrorMessage"] = $"Nội dung file {file.FileName} không trùng khớp với định dạng mở rộng ({ext}) thực tế.";
-                        return View();
-                    }
-
-                    // Đổi tên file ngẫu nhiên để tránh ghi đè file và tránh Path Traversal
-                    var uniqueFileName = $"{Guid.NewGuid()}{ext}";
-
-                    // Tạo thư mục uploads trong wwwroot nếu chưa có
-                    var uploadDir = Path.Combine(_env.WebRootPath, "uploads");
-                    if (!Directory.Exists(uploadDir))
-                    {
-                        Directory.CreateDirectory(uploadDir);
-                    }
-
-                    var filePath = Path.Combine(uploadDir, uniqueFileName);
-
-                    // Lưu file vật lý lên ổ đĩa cứng
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await file.CopyToAsync(stream);
-                    }
-
-                    // Thêm vào danh sách đính kèm của Post để lưu thông tin vào DB
-                    post.Attachments.Add(new Attachment
-                    {
-                        FileName = file.FileName, // Tên file hiển thị gốc
-                        FilePath = "/uploads/" + uniqueFileName // Đường dẫn tương đối dùng để tải về
-                    });
-                }
-            }
-
-            // Gọi Repository thực hiện lưu Database bằng Transaction
-            bool success = _postRepository.CreatePost(post);
-            if (success)
-            {
-                TempData["SuccessMessage"] = "Tạo bài viết mới thành công!";
+                TempData["SuccessMessage"] = "Tạo bài viết thành công!";
                 return RedirectToAction(nameof(Index));
             }
-
-            ModelState.AddModelError("", "Có lỗi xảy ra khi lưu cơ sở dữ liệu. Toàn bộ thay đổi đã bị hủy (Rollback).");
-            return View();
+            ModelState.AddModelError("", "Lỗi lưu CSDL (Rollback).");
+            return View(model);
         }
 
-        // 5. POST: Xóa bài viết (Chỉ cho phép Admin hoặc Tác giả xóa bài viết)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPost, ValidateAntiForgeryToken]
         public IActionResult Delete(int id)
         {
             var post = _postRepository.GetPostById(id);
-            if (post == null)
-            {
-                return NotFound();
-            }
+            if (post == null) return NotFound();
+            if (!IsOwnerOrAdmin(post)) return Forbid();
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var isAdmin = User.IsInRole("ADMIN");
+            foreach (var a in post.Attachments) DeletePhysicalFile(a.FilePath);
 
-            // Kiểm tra phân quyền: Chỉ ADMIN hoặc chính chủ mới được xóa
-            if (post.UserId.ToString() != userIdClaim && !isAdmin)
-            {
-                return Forbid();
-            }
-
-            // Xóa file vật lý trước
-            foreach (var attach in post.Attachments)
-            {
-                var fullPath = Path.Combine(_env.WebRootPath, attach.FilePath.TrimStart('/'));
-                if (System.IO.File.Exists(fullPath))
-                {
-                    System.IO.File.Delete(fullPath);
-                }
-            }
-
-            // Xóa DB
-            bool success = _postRepository.DeletePost(id);
-            if (success)
-            {
-                TempData["SuccessMessage"] = "Xóa bài viết thành công!";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Không thể xóa bài viết.";
-            }
-
+            if (_postRepository.DeletePost(id)) TempData["SuccessMessage"] = "Xóa bài viết thành công!";
+            else TempData["ErrorMessage"] = "Không thể xóa bài viết.";
             return RedirectToAction(nameof(Index));
         }
 
-
-
-        // 7. GET: Giao diện sửa bài viết
         [HttpGet]
         public IActionResult Edit(int id)
         {
             var post = _postRepository.GetPostById(id);
-            if (post == null)
+            if (post == null) return NotFound();
+            if (!IsOwnerOrAdmin(post)) return Forbid();
+
+            var model = new PostViewModel
             {
-                return NotFound();
-            }
-
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var isAdmin = User.IsInRole("ADMIN");
-
-            // Chỉ chủ bài viết hoặc Admin mới được sửa
-            if (post.UserId.ToString() != userIdClaim && !isAdmin)
-            {
-                return Forbid();
-            }
-
-            return View(post);
+                Id = post.Id,
+                Title = post.Title,
+                Content = post.Content,
+                Attachments = post.Attachments
+            };
+            return View(model);
         }
 
-        // 8. POST: Lưu thông tin sửa đổi bài viết (và thêm file đính kèm mới nếu có)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(Post post, List<IFormFile> files)
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(PostViewModel model, List<IFormFile> files)
         {
             if (!ModelState.IsValid)
             {
-                // Khi lỗi, cần hiển thị lại bài viết và các đính kèm hiện có
-                var fullPost = _postRepository.GetPostById(post.Id);
-                if (fullPost != null) post.Attachments = fullPost.Attachments;
-                return View(post);
+                model.Attachments = _postRepository.GetPostById(model.Id)?.Attachments ?? [];
+                return View(model);
             }
 
-            var existingPost = _postRepository.GetPostById(post.Id);
-            if (existingPost == null)
+            var existing = _postRepository.GetPostById(model.Id);
+            if (existing == null) return NotFound();
+            if (!IsOwnerOrAdmin(existing)) return Forbid();
+
+            var error = ValidateFiles(files);
+            if (error != null) { ViewData["ErrorMessage"] = error; model.Attachments = existing.Attachments; return View(model); }
+
+            var post = new Post
             {
-                return NotFound();
-            }
+                Id = model.Id,
+                Title = model.Title,
+                Content = model.Content,
+                UserId = existing.UserId,
+                CreatedAt = existing.CreatedAt
+            };
 
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var isAdmin = User.IsInRole("ADMIN");
-
-            if (existingPost.UserId.ToString() != userIdClaim && !isAdmin)
+            if (_postRepository.UpdatePost(post))
             {
-                return Forbid();
-            }
-
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx" };
-            long maxFileSize = 5 * 1024 * 1024; // 5 MB
-
-            // --- BƯỚC 1: XÁC MINH TOÀN BỘ CÁC FILE ĐÍNH KÈM TRƯỚC KHI THỰC HIỆN CẬP NHẬT ---
-            if (files != null && files.Count > 0)
-            {
-                foreach (var file in files)
-                {
-                    if (file == null || file.Length == 0) continue;
-
-                    // A. Kiểm tra dung lượng
-                    if (file.Length > maxFileSize)
-                    {
-                        ViewData["ErrorMessage"] = $"File {file.FileName} vượt quá dung lượng cho phép (Max 5MB).";
-                        post.Attachments = existingPost.Attachments;
-                        return View(post);
-                    }
-
-                    // B. Kiểm tra phần mở rộng file (Extension)
-                    var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                    if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
-                    {
-                        ViewData["ErrorMessage"] = $"File {file.FileName} không đúng định dạng cho phép (.jpg, .png, .pdf, .doc, .docx).";
-                        post.Attachments = existingPost.Attachments;
-                        return View(post);
-                    }
-
-                    // C. Kiểm tra chữ ký file thực tế (Magic Bytes) để chống đổi đuôi giả mạo
-                    if (!FileHelper.ValidateFileSignature(file, ext))
-                    {
-                        ViewData["ErrorMessage"] = $"Nội dung file {file.FileName} không trùng khớp với định dạng mở rộng ({ext}) thực tế.";
-                        post.Attachments = existingPost.Attachments;
-                        return View(post);
-                    }
-                }
-            }
-
-            // --- BƯỚC 2: CẬP NHẬT BÀI VIẾT VÀ LƯU FILE KHI ĐÃ HỢP LỆ ---
-            bool success = _postRepository.UpdatePost(post);
-            if (success)
-            {
-                if (files != null && files.Count > 0)
-                {
-                    foreach (var file in files)
-                    {
-                        if (file == null || file.Length == 0) continue;
-
-                        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                        var uniqueName = $"{Guid.NewGuid()}{ext}";
-                        var uploadDir = Path.Combine(_env.WebRootPath, "uploads");
-                        if (!Directory.Exists(uploadDir))
-                        {
-                            Directory.CreateDirectory(uploadDir);
-                        }
-
-                        var uploadPath = Path.Combine(uploadDir, uniqueName);
-                        using (var stream = new FileStream(uploadPath, FileMode.Create))
-                        {
-                            await file.CopyToAsync(stream);
-                        }
-
-                        var attachment = new Attachment
-                        {
-                            FileName = file.FileName,
-                            FilePath = "/uploads/" + uniqueName,
-                            PostId = post.Id
-                        };
-
-                        _postRepository.AddAttachment(attachment);
-                    }
-                }
-
+                await PersistFilesAsync(files, post, post.Id);
                 TempData["SuccessMessage"] = "Cập nhật bài viết thành công!";
                 return RedirectToAction(nameof(Index));
             }
-
-            ModelState.AddModelError("", "Cập nhật thất bại. Lỗi CSDL.");
-            post.Attachments = existingPost.Attachments;
-            return View(post);
+            ModelState.AddModelError("", "Cập nhật thất bại.");
+            model.Attachments = existing.Attachments;
+            return View(model);
         }
     }
 }

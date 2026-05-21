@@ -1,87 +1,76 @@
 @model IEnumerable<APPMVC.Models.Post>
 @{
-    ViewData["Title"] = "Danh sách bài viết";
+    ViewData["Title"] = "Bài viết";
 }
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Quản lý bài viết</h2>
-        @if (User.Identity?.IsAuthenticated == true)
-        {
-            <a asp-action="Create" class="btn btn-primary"><i class="bi bi-plus"></i> Tạo bài viết mới</a>
-        }
-    </div>
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h2>Danh sách bài viết</h2>
+    @if (User.Identity?.IsAuthenticated == true) {
+        <a asp-action="Create" class="btn btn-primary">Tạo bài mới</a>
+    }
+</div>
 
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>ID</th>
-                        <th>Tiêu đề</th>
-                        <th>Tác giả</th>
-                        <th>Ngày đăng</th>
-                        <th>Hành động</th>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="get" asp-action="Index" class="row g-2 mb-3">
+            <div class="col-md-5 col-sm-8">
+                <input type="text" name="search" class="form-control" placeholder="Tìm kiếm tiêu đề hoặc nội dung..." value="@ViewData["Search"]" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-secondary">Tìm kiếm</button>
+                @if (!string.IsNullOrEmpty(ViewData["Search"]?.ToString()))
+                {
+                    <a asp-action="Index" class="btn btn-outline-secondary ms-1">Xóa bộ lọc</a>
+                }
+            </div>
+        </form>
+
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>Tiêu đề</th>
+                    <th>Tác giả</th>
+                    <th>Ngày đăng</th>
+                    <th>Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr id="row-@p.Id">
+                        <td>@p.Id</td>
+                        <td><strong>@p.Title</strong></td>
+                        <td>@p.AuthorName</td>
+                        <td>@p.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-info">Xem</a>
+                            @if (User.Identity?.IsAuthenticated == true && (User.IsInRole("ADMIN") || User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == p.UserId.ToString()))
+                            {
+                                <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-warning">Sửa</a>
+                                <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Xác nhận xóa?');">
+                                    <button type="submit" class="btn btn-sm btn-danger">Xóa (Form)</button>
+                                </form>
+                                <button class="btn btn-sm btn-outline-danger" onclick="delPost(@p.Id)">Xóa (AJAX)</button>
+                            }
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach (var post in Model)
-                    {
-                        <tr id="post-row-@post.Id">
-                            <td>@post.Id</td>
-                            <td>
-                                <strong>@post.Title</strong>
-                            </td>
-                            <td><span class="badge bg-secondary">@post.AuthorName</span></td>
-                            <td>@post.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                            <td>
-                                <div class="btn-group">
-                                    <a asp-action="Details" asp-route-id="@post.Id" class="btn btn-sm btn-info text-white me-1">Xem</a>
-                                    
-                                    @* Chỉ Admin hoặc tác giả mới được quyền sửa/xóa *@
-                                    @if (User.Identity?.IsAuthenticated == true && (User.IsInRole("ADMIN") || User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == post.UserId.ToString()))
-                                    {
-                                        <a asp-action="Edit" asp-route-id="@post.Id" class="btn btn-sm btn-warning me-1">Sửa</a>
-
-                                        <!-- Xóa truyền thống qua Form POST + CSRF -->
-                                        <form asp-action="Delete" asp-route-id="@post.Id" method="post" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa?');">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-danger">Xóa (Form)</button>
-                                        </form>
-
-                                        <!-- Xóa bất đồng bộ qua AJAX -->
-                                        <button class="btn btn-sm btn-outline-danger ms-1" onclick="deletePostAjax(@post.Id)">Xóa (AJAX)</button>
-                                    }
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                    @if (!Model.Any())
-                    {
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">Chưa có bài viết nào.</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 
 @section Scripts {
 <script>
-    function deletePostAjax(postId) {
-        if (confirm("Bạn có chắc muốn xóa?")) {
-            fetch(`/PostApi/DeleteAjax?id=${postId}`, { method: 'POST' })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById(`post-row-${postId}`)?.remove();
-                        TempData["SuccessMessage"] = "Xóa bài viết thành công"
-                    } else {
-                        alert(data.message);
-                    }
-                });
+    function delPost(id) {
+        if (confirm("Xóa bài viết?")) {
+            fetch(`/PostApi/DeleteAjax?id=${id}`, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) document.getElementById(`row-${id}`).remove();
+                else alert(d.message);
+            });
         }
     }
 </script>
