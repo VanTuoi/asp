@@ -13,6 +13,7 @@ BEGIN
         Name NVARCHAR(100) NOT NULL,
         Email NVARCHAR(100) NOT NULL UNIQUE,
         PhoneNumber VARCHAR(20) NOT NULL,
+        Gender NVARCHAR(10) NOT NULL DEFAULT 'Nam',
         PasswordHash NVARCHAR(255) NOT NULL,
         Roles NVARCHAR(255) NOT NULL
     );

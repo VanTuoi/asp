@@ -32,6 +32,7 @@ namespace APPMVC.Controllers
                 Name = model.Name,
                 Email = model.Email,
                 PhoneNumber = model.PhoneNumber,
+                Gender = model.Gender,
                 roles = [Enum.TryParse<Role>(model.Role, out var parsedRole) ? parsedRole : Role.USER]
             };
 

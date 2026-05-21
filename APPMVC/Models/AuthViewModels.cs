@@ -21,6 +21,9 @@ namespace APPMVC.Models
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu phải từ 6 đến 100 ký tự.")]
         public string Password { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Vui lòng chọn giới tính.")]
+        public string Gender { get; set; } = "Nam";
+
         [Required(ErrorMessage = "Vui lòng chọn vai trò.")]
         public string Role { get; set; } = "USER";
     }

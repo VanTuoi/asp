@@ -1,5 +1,6 @@
 using APPMVC.Repositories;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace APPMVC
 {
@@ -9,9 +10,14 @@ namespace APPMVC
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Maximum 100MB (Global)
+            builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 104857600);
+            builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 104857600);
+
             // Add services to the container.
             builder.Services.AddRouting(options => options.LowercaseUrls = true);
             builder.Services.AddControllersWithViews();
+
             builder.Services.AddScoped<UserRepositories>();
             builder.Services.AddScoped<PostRepositories>();
 

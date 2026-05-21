@@ -35,6 +35,7 @@ BEGIN
         Id INT IDENTITY(1,1) PRIMARY KEY,
         Name NVARCHAR(100) NOT NULL,
         Email NVARCHAR(100) NOT NULL UNIQUE,
+        Gender NVARCHAR(10) NOT NULL DEFAULT 'Nam',
         PhoneNumber VARCHAR(20) NOT NULL,
         PasswordHash NVARCHAR(255) NOT NULL,
         Roles NVARCHAR(255) NOT NULL

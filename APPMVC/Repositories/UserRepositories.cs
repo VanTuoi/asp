@@ -30,13 +30,14 @@ namespace APPMVC.Repositories
             if ((int)checkCmd.ExecuteScalar()! > 0) return false;
 
             var insertQuery = @"
-                INSERT INTO Users (Name, Email, PhoneNumber, PasswordHash, Roles)
-                VALUES (@Name, @Email, @PhoneNumber, @PasswordHash, @Roles)";
+                INSERT INTO Users (Name, Email, PhoneNumber, Gender, PasswordHash, Roles)
+                VALUES (@Name, @Email, @PhoneNumber, @Gender, @PasswordHash, @Roles)";
             
             using var insertCmd = new SqlCommand(insertQuery, connection);
             insertCmd.Parameters.AddWithValue("@Name", user.Name);
             insertCmd.Parameters.AddWithValue("@Email", user.Email);
             insertCmd.Parameters.AddWithValue("@PhoneNumber", user.PhoneNumber);
+            insertCmd.Parameters.AddWithValue("@Gender", user.Gender);
             insertCmd.Parameters.AddWithValue("@PasswordHash", HashPassword(password));
             insertCmd.Parameters.AddWithValue("@Roles", string.Join(",", user.roles));
 
@@ -49,7 +50,7 @@ namespace APPMVC.Repositories
             using var connection = new SqlConnection(_connectionString);
             connection.Open();
             
-            var query = "SELECT Id, Name, Email, PhoneNumber, PasswordHash, Roles FROM Users WHERE Email = @Email";
+            var query = "SELECT Id, Name, Email, PhoneNumber, Gender, PasswordHash, Roles FROM Users WHERE Email = @Email";
             using var command = new SqlCommand(query, connection);
             command.Parameters.AddWithValue("@Email", email);
             
@@ -68,6 +69,7 @@ namespace APPMVC.Repositories
                 Name = (string)reader["Name"],
                 Email = (string)reader["Email"],
                 PhoneNumber = (string)reader["PhoneNumber"],
+                Gender = (string)reader["Gender"],
                 PasswordHash = dbPasswordHash,
                 roles = string.IsNullOrEmpty(rolesStr) 
                     ? [] 
