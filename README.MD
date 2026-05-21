@@ -34,54 +34,63 @@ BEGIN
     CREATE TABLE Users (
         Id INT IDENTITY(1,1) PRIMARY KEY,
         Name NVARCHAR(100) NOT NULL,
-        Email NVARCHAR(100) NOT NULL UNIQUE,
-        Gender NVARCHAR(10) NOT NULL DEFAULT 'Nam',
-        PhoneNumber VARCHAR(20) NOT NULL,
-        PasswordHash NVARCHAR(255) NOT NULL,
-        Roles NVARCHAR(255) NOT NULL
+        Email NVARCHAR(150) NOT NULL UNIQUE,
+        PasswordHash NVARCHAR(64) NOT NULL,
+        PhoneNumber NVARCHAR(20) NULL,
+        Gender NVARCHAR(10) NULL,
+        Roles NVARCHAR(50) NOT NULL
     );
 END
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Posts')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Categories')
 BEGIN
-    CREATE TABLE Posts (
+    CREATE TABLE Categories (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        Title NVARCHAR(255) NOT NULL,
-        Content NVARCHAR(MAX) NOT NULL,
-        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-        UserId INT NOT NULL,
-        CONSTRAINT FK_Posts_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+        Name NVARCHAR(100) NOT NULL,
+        Description NVARCHAR(250) NULL
     );
+    
+    INSERT INTO Categories (Name, Description) VALUES 
+    (N'Quyết định', N'Các văn bản quyết định của tổ chức/cơ quan'),
+    (N'Nghị quyết', N'Các nghị quyết chỉ đạo, điều hành'),
+    (N'Công văn', N'Công văn hành chính đi và đến'),
+    (N'Tờ trình', N'Tờ trình đề xuất ý kiến, phương án công tác');
 END
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Attachments')
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Documents')
 BEGIN
-    CREATE TABLE Attachments (
+    CREATE TABLE Documents (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        FileName NVARCHAR(255) NOT NULL,
+        Title NVARCHAR(200) NOT NULL,
+        Description NVARCHAR(MAX) NULL,
         FilePath NVARCHAR(500) NOT NULL,
-        PostId INT NOT NULL,
-        CONSTRAINT FK_Attachments_Posts FOREIGN KEY (PostId) REFERENCES Posts(Id) ON DELETE CASCADE
+        FileName NVARCHAR(250) NOT NULL,
+        UploadedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        CategoryId INT NOT NULL,
+        UserId INT NOT NULL,
+        CONSTRAINT FK_Documents_Categories FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_Documents_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
     );
 END
 GO
 
-IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = 'sp_GetPostDetails')
-    DROP PROCEDURE sp_GetPostDetails;
+IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = 'sp_GetDocumentDetails')
+    DROP PROCEDURE sp_GetDocumentDetails;
 GO
-CREATE PROCEDURE sp_GetPostDetails
-    @PostId INT
+CREATE PROCEDURE sp_GetDocumentDetails
+    @DocumentId INT
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT p.Id, p.Title, p.Content, p.CreatedAt, p.UserId, u.Name AS AuthorName
-    FROM Posts p
-    INNER JOIN Users u ON p.UserId = u.Id
-    WHERE p.Id = @PostId;
-
-    SELECT Id, FileName, FilePath, PostId FROM Attachments WHERE PostId = @PostId;
+    SELECT d.Id, d.Title, d.Description, d.FilePath, d.FileName, d.UploadedAt,
+           d.CategoryId, c.Name AS CategoryName,
+           d.UserId, u.Name AS AuthorName
+    FROM Documents d
+    INNER JOIN Categories c ON d.CategoryId = c.Id
+    INNER JOIN Users u ON d.UserId = u.Id
+    WHERE d.Id = @DocumentId;
 END
 GO
 ```

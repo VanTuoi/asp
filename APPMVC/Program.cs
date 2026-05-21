@@ -19,7 +19,7 @@ namespace APPMVC
             builder.Services.AddControllersWithViews();
 
             builder.Services.AddScoped<UserRepositories>();
-            builder.Services.AddScoped<PostRepositories>();
+            builder.Services.AddScoped<DocumentRepositories>();
 
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>

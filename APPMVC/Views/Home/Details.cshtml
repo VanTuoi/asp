@@ -1,43 +1,42 @@
-@model APPMVC.Models.Post
+@model APPMVC.Models.Document
 @{
-    ViewData["Title"] = Model.Title;
+    ViewData["Title"] = "Chi tiết tài liệu";
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var isAdmin = User.IsInRole("ADMIN");
+    bool canEditOrDelete = Model.UserId.ToString() == currentUserId || isAdmin;
 }
 
-<div class="row justify-content-center mt-4">
-    <div class="col-md-8">
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <h2>@Model.Title</h2>
-                <div class="text-muted mb-3">
-                    Tác giả: <strong>@Model.AuthorName</strong> | Đăng lúc: @Model.CreatedAt.ToString("dd/MM/yyyy HH:mm")
-                </div>
-                <hr />
-                <div style="white-space: pre-line;">@Model.Content</div>
-            </div>
-        </div>
+<h2 class="my-4">Chi tiết tài liệu</h2>
 
-        <div class="card shadow-sm mb-4">
-            <div class="card-header">Tệp đính kèm</div>
-            <div class="card-body">
-                @if (Model.Attachments?.Any() == true)
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var file in Model.Attachments)
-                        {
-                            <li class="list-group-item d-flex justify-content-between px-0">
-                                @file.FileName
-                                <a href="@file.FilePath" download="@file.FileName" class="btn btn-sm btn-outline-primary">Tải về</a>
-                            </li>
-                        }
-                    </ul>
-                }
-                else
-                {
-                    <span class="text-muted">Không có đính kèm.</span>
-                }
-            </div>
-        </div>
+<div class="col-md-8 border p-4 rounded bg-light">
+    <h3 class="text-primary mb-3">@Model.Title</h3>
+    <hr />
+    
+    <p><strong>Danh mục:</strong> <span class="badge bg-info text-dark">@Model.CategoryName</span></p>
+    <p><strong>Người đăng:</strong> @Model.AuthorName</p>
+    <p><strong>Ngày tải lên:</strong> @Model.UploadedAt.ToString("dd/MM/yyyy HH:mm:ss")</p>
+    
+    <div class="mb-4">
+        <strong>Mô tả:</strong>
+        <p class="p-2 border bg-white rounded" style="white-space: pre-line;">
+            @(string.IsNullOrEmpty(Model.Description) ? "Không có mô tả." : Model.Description)
+        </p>
+    </div>
 
+    <div class="alert alert-secondary d-flex justify-content-between align-items-center mb-4">
+        <span>Tệp đính kèm: <strong>@Model.FileName</strong></span>
+        <a href="@Model.FilePath" class="btn btn-success" target="_blank">Xem / Tải xuống</a>
+    </div>
+
+    <div class="d-flex gap-2">
         <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+        @if (canEditOrDelete)
+        {
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">Sửa</a>
+            <form asp-action="Delete" asp-route-id="@Model.Id" method="post" onsubmit="return confirm('Xóa tài liệu này?');" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger">Xóa</button>
+            </form>
+        }
     </div>
 </div>

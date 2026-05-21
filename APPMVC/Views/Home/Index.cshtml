@@ -1,77 +1,112 @@
-@model IEnumerable<APPMVC.Models.Post>
+@model IEnumerable<APPMVC.Models.Document>
 @{
-    ViewData["Title"] = "Bài viết";
+    ViewData["Title"] = "Danh sách tài liệu";
+    var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    var isAdmin = User.IsInRole("ADMIN");
 }
 
-<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
-    <h2>Danh sách bài viết</h2>
-    @if (User.Identity?.IsAuthenticated == true) {
-        <a asp-action="Create" class="btn btn-primary">Tạo bài mới</a>
+<h2 class="my-4">Quản lý Tài liệu & Công văn</h2>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <form method="get" asp-action="Index" class="d-flex gap-2 w-75">
+        <input type="text" name="search" class="form-control w-50" placeholder="Tìm kiếm tiêu đề, mô tả..." value="@ViewData["Search"]" />
+        <select name="categoryId" class="form-select w-25" asp-items="ViewBag.Categories">
+            <option value="">-- Tất cả danh mục --</option>
+        </select>
+        <button type="submit" class="btn btn-secondary">Tìm</button>
+    </form>
+    
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <a asp-action="Create" class="btn btn-primary">Thêm tài liệu</a>
     }
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <form method="get" asp-action="Index" class="row g-2 mb-3">
-            <div class="col-md-5 col-sm-8">
-                <input type="text" name="search" class="form-control" placeholder="Tìm kiếm tiêu đề hoặc nội dung..." value="@ViewData["Search"]" />
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-secondary">Tìm kiếm</button>
-                @if (!string.IsNullOrEmpty(ViewData["Search"]?.ToString()))
-                {
-                    <a asp-action="Index" class="btn btn-outline-secondary ms-1">Xóa bộ lọc</a>
-                }
-            </div>
-        </form>
-
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
+<table class="table table-bordered table-striped align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>Tiêu đề</th>
+            <th>Danh mục</th>
+            <th>Người đăng</th>
+            <th>Ngày tải lên</th>
+            <th>Tệp đính kèm</th>
+            <th>Thao tác</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model == null || !Model.Any())
+        {
+            <tr>
+                <td colspan="6" class="text-center text-muted">Không có tài liệu nào.</td>
+            </tr>
+        }
+        else
+        {
+            foreach (var item in Model)
+            {
+                bool canEditOrDelete = item.UserId.ToString() == currentUserId || isAdmin;
                 <tr>
-                    <th>ID</th>
-                    <th>Tiêu đề</th>
-                    <th>Tác giả</th>
-                    <th>Ngày đăng</th>
-                    <th>Thao tác</th>
+                    <td><a asp-action="Details" asp-route-id="@item.Id" class="fw-bold text-decoration-none">@item.Title</a></td>
+                    <td><span class="badge bg-info text-dark">@item.CategoryName</span></td>
+                    <td>@item.AuthorName</td>
+                    <td>@item.UploadedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>
+                        <a href="@item.FilePath" target="_blank">@item.FileName</a>
+                    </td>
+                    <td>
+                        @if (canEditOrDelete)
+                        {
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">Sửa</a>
+                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Xóa tài liệu này?');" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                            </form>
+                        }
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                @foreach (var p in Model)
-                {
-                    <tr id="row-@p.Id">
-                        <td>@p.Id</td>
-                        <td><strong>@p.Title</strong></td>
-                        <td>@p.AuthorName</td>
-                        <td>@p.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                        <td>
-                            <a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-info">Xem</a>
-                            @if (User.Identity?.IsAuthenticated == true && (User.IsInRole("ADMIN") || User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value == p.UserId.ToString()))
-                            {
-                                <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-warning">Sửa</a>
-                                <form asp-action="Delete" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Xác nhận xóa?');">
-                                    <button type="submit" class="btn btn-sm btn-danger">Xóa (Form)</button>
-                                </form>
-                                <button class="btn btn-sm btn-outline-danger" onclick="delPost(@p.Id)">Xóa (AJAX)</button>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+            }
+        }
+    </tbody>
+</table>
+
+<hr class="my-4" />
+<h5 class="mb-3">Tìm kiếm bất đồng bộ (AJAX + JSON)</h5>
+<div class="d-flex gap-2 mb-3">
+    <input type="text" id="ajaxSearch" class="form-control w-25" placeholder="Nhập từ khóa..." />
+    <button onclick="loadDocuments()" class="btn btn-outline-primary">Tải dữ liệu (AJAX)</button>
 </div>
+<div id="ajaxResult"></div>
 
 @section Scripts {
-<script>
-    function delPost(id) {
-        if (confirm("Xóa bài viết?")) {
-            fetch(`/PostApi/DeleteAjax?id=${id}`, { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-                if (d.success) document.getElementById(`row-${id}`).remove();
-                else alert(d.message);
-            });
+    <script>
+        function loadDocuments() {
+            var keyword = document.getElementById('ajaxSearch').value;
+            fetch('/home/getdocumentsjson?search=' + encodeURIComponent(keyword))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.length === 0) {
+                        document.getElementById('ajaxResult').innerHTML = '<p class="text-muted">Không tìm thấy tài liệu nào.</p>';
+                        return;
+                    }
+                    var html = '<table class="table table-bordered table-sm"><thead class="table-secondary"><tr><th>Tiêu đề</th><th>Danh mục</th><th>Người đăng</th><th>Ngày tải lên</th></tr></thead><tbody>';
+                    data.forEach(function(doc) {
+                        html += '<tr><td>' + doc.title + '</td><td>' + doc.categoryName + '</td><td>' + doc.authorName + '</td><td>' + doc.uploadedAt + '</td></tr>';
+                    });
+                    html += '</tbody></table>';
+                    document.getElementById('ajaxResult').innerHTML = html;
+                })
+                .catch(function(err) {
+                    document.getElementById('ajaxResult').innerHTML = '<p class="text-danger">Lỗi khi tải dữ liệu: ' + err + '</p>';
+                });
         }
-    }
-</script>
+    </script>
 }
