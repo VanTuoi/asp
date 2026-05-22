@@ -10,11 +10,7 @@ namespace APPMVC.Controllers
     public class AuthController : Controller
     {
         private readonly UserRepositories _userRepository;
-
-        public AuthController(UserRepositories userRepository)
-        {
-            _userRepository = userRepository;
-        }
+        public AuthController(UserRepositories userRepository) => _userRepository = userRepository;
 
         [HttpGet]
         public IActionResult Register() => User.Identity?.IsAuthenticated == true ? RedirectToAction("Index", "Home") : View();
@@ -22,18 +18,14 @@ namespace APPMVC.Controllers
         [HttpPost]
         public IActionResult Register(RegisterViewModel model)
         {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
+            if (!ModelState.IsValid) return View(model);
 
             var user = new User
             {
                 Name = model.Name,
                 Email = model.Email,
-                PhoneNumber = model.PhoneNumber,
                 Gender = model.Gender,
-                roles = [Enum.TryParse<Role>(model.Role, out var parsedRole) ? parsedRole : Role.USER]
+                roles = [Enum.Parse<Role>(model.Role)]
             };
 
             if (_userRepository.Register(user, model.Password))
@@ -52,10 +44,7 @@ namespace APPMVC.Controllers
         [HttpPost]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
+            if (!ModelState.IsValid) return View(model);
 
             var user = _userRepository.Login(model.Email, model.Password);
             if (user == null)
@@ -70,10 +59,10 @@ namespace APPMVC.Controllers
                 new(ClaimTypes.Name, user.Email),
                 new("DisplayName", user.Name)
             };
-            claims.AddRange(user.roles.Select(role => new Claim(ClaimTypes.Role, role.ToString())));
+            claims.AddRange(user.roles.Select(r => new Claim(ClaimTypes.Role, r.ToString())));
 
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), new AuthenticationProperties { IsPersistent = true });
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = true });
             
             return RedirectToAction("Index", "Home");
         }

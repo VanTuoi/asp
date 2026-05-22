@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using APPMVC.Models;
 using APPMVC.Repositories;
 using APPMVC.Helpers;
@@ -19,46 +18,42 @@ namespace APPMVC.Controllers
         private readonly DocumentRepositories _documentRepository;
         private readonly IWebHostEnvironment _env;
 
-        public HomeController(DocumentRepositories documentRepository, IWebHostEnvironment env)
+        public HomeController(DocumentRepositories docRepo, IWebHostEnvironment env)
         {
-            _documentRepository = documentRepository;
+            _documentRepository = docRepo;
             _env = env;
         }
 
         private string? UserId => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         private bool IsOwnerOrAdmin(Document doc) => doc.UserId.ToString() == UserId || User.IsInRole("ADMIN");
 
-        private void DeletePhysicalFile(string path)
+        private void DeleteFile(string? path)
         {
             if (string.IsNullOrEmpty(path)) return;
             var fullPath = Path.Combine(_env.WebRootPath, path.TrimStart('/'));
             if (System.IO.File.Exists(fullPath)) System.IO.File.Delete(fullPath);
         }
 
-        private static readonly string[] _allowedExt = [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"];
-        private const long _maxSize = 5 * 1024 * 1024; // 5MB
-
         private string? ValidateFile(IFormFile? file)
         {
             if (file == null || file.Length == 0) return null;
-            if (file.Length > _maxSize) return "Dung lượng file vượt quá giới hạn 5MB.";
+            if (file.Length > 5 * 1024 * 1024) return "Dung lượng file vượt quá giới hạn 5MB.";
             
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!_allowedExt.Contains(ext)) return "Định dạng file không được hỗ trợ (chỉ nhận JPG, PNG, PDF, DOC, DOCX).";
+            if (!new[] { ".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx" }.Contains(ext)) 
+                return "Định dạng file không được hỗ trợ.";
             
-            if (!FileHelper.ValidateFileSignature(file, ext)) return "Nội dung file không hợp lệ (nghi ngờ giả mạo phần mở rộng).";
+            if (!FileHelper.ValidateFileSignature(file, ext)) 
+                return "Nội dung file không hợp lệ (nghi ngờ giả mạo đuôi file).";
             
             return null;
         }
 
-        private async Task<(string FilePath, string FileName)> SavePhysicalFileAsync(IFormFile file)
+        private async Task<(string FilePath, string FileName)> SaveFileAsync(IFormFile file)
         {
-            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads");
-            Directory.CreateDirectory(uploadsDir);
-
-            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var uniqueName = $"{Guid.NewGuid()}{ext}";
-            var fullPath = Path.Combine(uploadsDir, uniqueName);
+            var uniqueName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName).ToLowerInvariant()}";
+            var fullPath = Path.Combine(_env.WebRootPath, "uploads", uniqueName);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
             await using var stream = new FileStream(fullPath, FileMode.Create);
             await file.CopyToAsync(stream);
@@ -67,64 +62,35 @@ namespace APPMVC.Controllers
         }
 
         [HttpGet, AllowAnonymous]
-        public IActionResult GetDocumentsJson(string? search)
-        {
-            var docs = _documentRepository.GetDocuments(search);
-            return Json(docs);
-        }
+        public IActionResult GetDocumentsJson(string? search) => Json(_documentRepository.GetDocuments(search));
 
         [AllowAnonymous]
-        public IActionResult Index(string? search, int? categoryId)
+        public IActionResult Index(string? search)
         {
             ViewData["Search"] = search;
-            ViewData["CategoryId"] = categoryId;
-            
-            ViewBag.Categories = _documentRepository.GetCategories()
-                .Select(c => new SelectListItem { Value = c.Id.ToString(), Text = c.Name, Selected = c.Id == categoryId })
-                .ToList();
-
-            var docs = _documentRepository.GetDocuments(search, categoryId);
-            return View(docs);
+            return View(_documentRepository.GetDocuments(search));
         }
 
         [AllowAnonymous]
         public IActionResult Details(int id)
         {
             var doc = _documentRepository.GetDocumentById(id);
-            if (doc == null) return NotFound();
-            return View(doc);
+            return doc == null ? NotFound() : View(doc);
         }
 
         [HttpGet]
-        public IActionResult Create()
-        {
-            ViewBag.Categories = new SelectList(_documentRepository.GetCategories(), "Id", "Name");
-            return View();
-        }
+        public IActionResult Create() => View();
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(DocumentViewModel model, IFormFile? file)
         {
-            ViewBag.Categories = new SelectList(_documentRepository.GetCategories(), "Id", "Name", model.CategoryId);
-            
-            if (file == null || file.Length == 0)
-            {
-                ModelState.AddModelError("file", "Vui lòng chọn file đính kèm.");
-            }
-
+            if (file == null || file.Length == 0) ModelState.AddModelError("file", "Vui lòng chọn file.");
             if (!ModelState.IsValid) return View(model);
 
-            var fileError = ValidateFile(file);
-            if (fileError != null)
-            {
-                ViewData["ErrorMessage"] = fileError;
-                return View(model);
-            }
+            var err = ValidateFile(file);
+            if (err != null) { ViewData["ErrorMessage"] = err; return View(model); }
 
-            if (!int.TryParse(UserId, out int userId)) return Challenge();
-
-            var (filePath, fileName) = await SavePhysicalFileAsync(file!);
-
+            var (filePath, fileName) = await SaveFileAsync(file!);
             var doc = new Document
             {
                 Title = model.Title,
@@ -132,8 +98,7 @@ namespace APPMVC.Controllers
                 FilePath = filePath,
                 FileName = fileName,
                 UploadedAt = DateTime.Now,
-                CategoryId = model.CategoryId,
-                UserId = userId
+                UserId = int.Parse(UserId!)
             };
 
             if (_documentRepository.CreateDocument(doc))
@@ -142,8 +107,8 @@ namespace APPMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            DeletePhysicalFile(filePath);
-            ModelState.AddModelError("", "Lưu thông tin vào cơ sở dữ liệu thất bại.");
+            DeleteFile(filePath);
+            ModelState.AddModelError("", "Lưu thông tin thất bại.");
             return View(model);
         }
 
@@ -154,81 +119,56 @@ namespace APPMVC.Controllers
             if (doc == null) return NotFound();
             if (!IsOwnerOrAdmin(doc)) return Forbid();
 
-            var model = new DocumentViewModel
+            return View(new DocumentViewModel
             {
                 Id = doc.Id,
                 Title = doc.Title,
                 Description = doc.Description,
-                CategoryId = doc.CategoryId,
                 CurrentFileName = doc.FileName,
                 CurrentFilePath = doc.FilePath
-            };
-
-            ViewBag.Categories = new SelectList(_documentRepository.GetCategories(), "Id", "Name", doc.CategoryId);
-            return View(model);
+            });
         }
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(DocumentViewModel model, IFormFile? file)
         {
-            var existingDoc = _documentRepository.GetDocumentById(model.Id);
-            if (existingDoc == null) return NotFound();
-            if (!IsOwnerOrAdmin(existingDoc)) return Forbid();
-
-            ViewBag.Categories = new SelectList(_documentRepository.GetCategories(), "Id", "Name", model.CategoryId);
+            var doc = _documentRepository.GetDocumentById(model.Id);
+            if (doc == null) return NotFound();
+            if (!IsOwnerOrAdmin(doc)) return Forbid();
 
             if (!ModelState.IsValid)
             {
-                model.CurrentFileName = existingDoc.FileName;
-                model.CurrentFilePath = existingDoc.FilePath;
+                model.CurrentFileName = doc.FileName;
+                model.CurrentFilePath = doc.FilePath;
                 return View(model);
             }
 
-            string? newFilePath = null;
-            string? newFileName = null;
-
+            string? newPath = null, newName = null;
             if (file != null && file.Length > 0)
             {
-                var fileError = ValidateFile(file);
-                if (fileError != null)
-                {
-                    ViewData["ErrorMessage"] = fileError;
-                    model.CurrentFileName = existingDoc.FileName;
-                    model.CurrentFilePath = existingDoc.FilePath;
-                    return View(model);
-                }
-
-                (newFilePath, newFileName) = await SavePhysicalFileAsync(file);
+                var err = ValidateFile(file);
+                if (err != null) { ViewData["ErrorMessage"] = err; return View(model); }
+                (newPath, newName) = await SaveFileAsync(file);
             }
 
-            var docToUpdate = new Document
+            var toUpdate = new Document
             {
                 Id = model.Id,
                 Title = model.Title,
                 Description = model.Description,
-                CategoryId = model.CategoryId,
-                FilePath = newFilePath ?? string.Empty,
-                FileName = newFileName ?? string.Empty
+                FilePath = newPath ?? string.Empty,
+                FileName = newName ?? string.Empty
             };
 
-            if (_documentRepository.UpdateDocument(docToUpdate))
+            if (_documentRepository.UpdateDocument(toUpdate))
             {
-                if (!string.IsNullOrEmpty(newFilePath))
-                {
-                    DeletePhysicalFile(existingDoc.FilePath);
-                }
-                TempData["SuccessMessage"] = "Cập nhật tài liệu thành công!";
+                if (!string.IsNullOrEmpty(newPath)) DeleteFile(doc.FilePath);
+                TempData["SuccessMessage"] = "Cập nhật thành công!";
                 return RedirectToAction(nameof(Index));
             }
 
-            if (!string.IsNullOrEmpty(newFilePath))
-            {
-                DeletePhysicalFile(newFilePath);
-            }
-
-            ModelState.AddModelError("", "Cập nhật tài liệu thất bại.");
-            model.CurrentFileName = existingDoc.FileName;
-            model.CurrentFilePath = existingDoc.FilePath;
+            if (!string.IsNullOrEmpty(newPath)) DeleteFile(newPath);
+            ModelState.AddModelError("", "Cập nhật thất bại.");
             return View(model);
         }
 
@@ -239,16 +179,9 @@ namespace APPMVC.Controllers
             if (doc == null) return NotFound();
             if (!IsOwnerOrAdmin(doc)) return Forbid();
 
-            DeletePhysicalFile(doc.FilePath);
-
-            if (_documentRepository.DeleteDocument(id))
-            {
-                TempData["SuccessMessage"] = "Xóa tài liệu thành công!";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Xóa tài liệu thất bại.";
-            }
+            DeleteFile(doc.FilePath);
+            if (_documentRepository.DeleteDocument(id)) TempData["SuccessMessage"] = "Xóa thành công!";
+            else TempData["ErrorMessage"] = "Xóa thất bại.";
 
             return RedirectToAction(nameof(Index));
         }

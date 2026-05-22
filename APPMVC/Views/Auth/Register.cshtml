@@ -3,71 +3,45 @@
     ViewData["Title"] = "Đăng ký";
 }
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-4">Đăng ký tài khoản</h3>
-                
-                <form asp-action="Register" method="post">
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+<h3>Đăng ký</h3>
 
-                    <div class="mb-3">
-                        <label asp-for="Name" class="form-label">Họ tên</label>
-                        <input asp-for="Name" class="form-control" />
-                        <span asp-validation-for="Name" class="text-danger small"></span>
-                    </div>
+<form asp-action="Register" method="post">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-                    <div class="mb-3">
-                        <label asp-for="Email" class="form-label">Email</label>
-                        <input asp-for="Email" class="form-control" />
-                        <span asp-validation-for="Email" class="text-danger small"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="PhoneNumber" class="form-label">Số điện thoại</label>
-                        <input asp-for="PhoneNumber" class="form-control" />
-                        <span asp-validation-for="PhoneNumber" class="text-danger small"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label d-block">Giới tính</label>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" asp-for="Gender" value="Nam" id="genderMale" checked />
-                            <label class="form-check-label" for="genderMale">Nam</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" asp-for="Gender" value="Nữ" id="genderFemale" />
-                            <label class="form-check-label" for="genderFemale">Nữ</label>
-                        </div>
-                        <span asp-validation-for="Gender" class="text-danger small d-block"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="Password" class="form-label">Mật khẩu</label>
-                        <input asp-for="Password" class="form-control" type="password" />
-                        <span asp-validation-for="Password" class="text-danger small"></span>
-                    </div>
-
-                    <div class="mb-4">
-                        <label asp-for="Role" class="form-label">Vai trò</label>
-                        <select asp-for="Role" class="form-select">
-                            <option value="USER">Người dùng</option>
-                            <option value="ADMIN">Quản trị viên</option>
-                        </select>
-                        <span asp-validation-for="Role" class="text-danger small"></span>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 mb-3">Đăng ký</button>
-
-                    <div class="text-center">
-                        <a asp-action="Login" class="text-decoration-none">Đã có tài khoản? Đăng nhập</a>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <div class="mb-2">
+        <label asp-for="Name">Họ tên</label>
+        <input asp-for="Name" class="form-control" />
     </div>
-</div>
+
+    <div class="mb-2">
+        <label asp-for="Email">Email</label>
+        <input asp-for="Email" class="form-control" />
+    </div>
+
+    <div class="mb-2">
+        <label asp-for="Gender">Giới tính</label>
+        <select asp-for="Gender" class="form-select">
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+        </select>
+    </div>
+
+    <div class="mb-2">
+        <label asp-for="Password">Mật khẩu</label>
+        <input asp-for="Password" type="password" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Role">Vai trò</label>
+        <select asp-for="Role" class="form-select">
+            <option value="USER">Người dùng</option>
+            <option value="ADMIN">Quản trị viên</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Đăng ký</button>
+    <a asp-action="Login" class="ms-2">Đăng nhập</a>
+</form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

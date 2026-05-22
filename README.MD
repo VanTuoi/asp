@@ -36,26 +36,9 @@ BEGIN
         Name NVARCHAR(100) NOT NULL,
         Email NVARCHAR(150) NOT NULL UNIQUE,
         PasswordHash NVARCHAR(64) NOT NULL,
-        PhoneNumber NVARCHAR(20) NULL,
         Gender NVARCHAR(10) NULL,
         Roles NVARCHAR(50) NOT NULL
     );
-END
-GO
-
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Categories')
-BEGIN
-    CREATE TABLE Categories (
-        Id INT IDENTITY(1,1) PRIMARY KEY,
-        Name NVARCHAR(100) NOT NULL,
-        Description NVARCHAR(250) NULL
-    );
-    
-    INSERT INTO Categories (Name, Description) VALUES 
-    (N'Quyết định', N'Các văn bản quyết định của tổ chức/cơ quan'),
-    (N'Nghị quyết', N'Các nghị quyết chỉ đạo, điều hành'),
-    (N'Công văn', N'Công văn hành chính đi và đến'),
-    (N'Tờ trình', N'Tờ trình đề xuất ý kiến, phương án công tác');
 END
 GO
 
@@ -68,29 +51,9 @@ BEGIN
         FilePath NVARCHAR(500) NOT NULL,
         FileName NVARCHAR(250) NOT NULL,
         UploadedAt DATETIME NOT NULL DEFAULT GETDATE(),
-        CategoryId INT NOT NULL,
         UserId INT NOT NULL,
-        CONSTRAINT FK_Documents_Categories FOREIGN KEY (CategoryId) REFERENCES Categories(Id) ON DELETE CASCADE,
         CONSTRAINT FK_Documents_Users FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
     );
-END
-GO
-
-IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = 'sp_GetDocumentDetails')
-    DROP PROCEDURE sp_GetDocumentDetails;
-GO
-CREATE PROCEDURE sp_GetDocumentDetails
-    @DocumentId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT d.Id, d.Title, d.Description, d.FilePath, d.FileName, d.UploadedAt,
-           d.CategoryId, c.Name AS CategoryName,
-           d.UserId, u.Name AS AuthorName
-    FROM Documents d
-    INNER JOIN Categories c ON d.CategoryId = c.Id
-    INNER JOIN Users u ON d.UserId = u.Id
-    WHERE d.Id = @DocumentId;
 END
 GO
 ```
