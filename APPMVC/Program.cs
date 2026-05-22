@@ -45,7 +45,7 @@ namespace APPMVC
             app.UseHttpsRedirection();
             app.UseRouting();
 
-            // BẬT DÒNG NÀY NẾU ĐỀ YÊU CẦU DÙNG SESSION:
+            // SESSION:
             // app.UseSession();
 
             app.UseAuthentication();
