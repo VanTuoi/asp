@@ -42,7 +42,16 @@
                     <td><a asp-action="Details" asp-route-id="@item.Id" class="text-decoration-none fw-bold">@item.Title</a></td>
                     <td>@item.AuthorName</td>
                     <td>@item.UploadedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                    <td><a href="@item.FilePath" target="_blank" class="text-decoration-none"><i class="bi bi-file-earmark-arrow-down-fill me-1"></i>@item.FileName</a></td>
+                    <td>
+                        @if (!string.IsNullOrEmpty(item.FilePath))
+                        {
+                            <a href="@item.FilePath" target="_blank" class="text-decoration-none">@item.FileName</a>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">Không có tệp</span>
+                        }
+                    </td>
                     <td>
                         @if (canEditOrDelete)
                         {

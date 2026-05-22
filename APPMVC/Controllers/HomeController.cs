@@ -61,8 +61,9 @@ namespace APPMVC.Controllers
             return ("/uploads/" + uniqueName, file.FileName);
         }
 
-        [HttpGet, AllowAnonymous]
-        public IActionResult GetDocumentsJson(string? search) => Json(_documentRepository.GetDocuments(search));
+        // FOR API: Return JSON to load data with AJAX (Uncomment if needed)
+        // [HttpGet, AllowAnonymous]
+        // public IActionResult GetDocumentsJson(string? search) => Json(_documentRepository.GetDocuments(search));
 
         [AllowAnonymous]
         public IActionResult Index(string? search)
@@ -84,13 +85,20 @@ namespace APPMVC.Controllers
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(DocumentViewModel model, IFormFile? file)
         {
-            if (file == null || file.Length == 0) ModelState.AddModelError("file", "Vui lòng chọn file.");
+            // if (file == null || file.Length == 0) ModelState.AddModelError("file", "Vui lòng chọn file.");
+
             if (!ModelState.IsValid) return View(model);
 
-            var err = ValidateFile(file);
-            if (err != null) { ViewData["ErrorMessage"] = err; return View(model); }
+            string filePath = string.Empty;
+            string fileName = string.Empty;
 
-            var (filePath, fileName) = await SaveFileAsync(file!);
+            if (file != null && file.Length > 0)
+            {
+                var err = ValidateFile(file);
+                if (err != null) { ViewData["ErrorMessage"] = err; return View(model); }
+                (filePath, fileName) = await SaveFileAsync(file);
+            }
+
             var doc = new Document
             {
                 Title = model.Title,
