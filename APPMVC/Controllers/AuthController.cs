@@ -46,12 +46,33 @@ namespace APPMVC.Controllers
         {
             if (!ModelState.IsValid) return View(model);
 
+            // BẬT ĐOẠN NÀY NẾU ĐỀ YÊU CẦU DÙNG SESSION ĐỂ ĐẾM SỐ LẦN ĐĂNG NHẬP SAI:
+            /*
+            int failedAttempts = HttpContext.Session.GetInt32("FailedAttempts") ?? 0;
+            if (failedAttempts >= 3)
+            {
+                ModelState.AddModelError("", "Tài khoản bị tạm khóa do nhập sai quá 3 lần.");
+                return View(model);
+            }
+            */
+
             var user = _userRepository.Login(model.Email, model.Password);
             if (user == null)
             {
+                // BẬT ĐOẠN NÀY NẾU ĐỀ YÊU CẦU DÙNG SESSION ĐỂ ĐẾM SỐ LẦN ĐĂNG NHẬP SAI:
+                /*
+                failedAttempts++;
+                HttpContext.Session.SetInt32("FailedAttempts", failedAttempts);
+                ModelState.AddModelError("", $"Sai thông tin. Bạn đã sai {failedAttempts} lần (Tối đa 3).");
+                return View(model);
+                */
+
                 ModelState.AddModelError("", "Email hoặc mật khẩu không chính xác.");
                 return View(model);
             }
+
+            // Đăng nhập thành công -> Reset lại số lần sai (Bật dòng này nếu dùng Session):
+            // HttpContext.Session.Remove("FailedAttempts");
 
             var claims = new List<Claim>
             {

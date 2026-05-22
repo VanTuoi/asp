@@ -21,6 +21,9 @@ namespace APPMVC
             builder.Services.AddScoped<UserRepositories>();
             builder.Services.AddScoped<DocumentRepositories>();
 
+            // SESSION:
+            // builder.Services.AddSession(o => o.IdleTimeout = TimeSpan.FromMinutes(20));
+
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>
                 {
@@ -41,6 +44,9 @@ namespace APPMVC
 
             app.UseHttpsRedirection();
             app.UseRouting();
+
+            // BẬT DÒNG NÀY NẾU ĐỀ YÊU CẦU DÙNG SESSION:
+            // app.UseSession();
 
             app.UseAuthentication();
             app.UseAuthorization();
